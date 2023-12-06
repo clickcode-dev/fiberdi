@@ -9,7 +9,4 @@ var Module = fiberdi.Module{
 	Injectables: []interface{}{
 		&DogService{},
 	},
-	Exports: []interface{}{
-		&DogService{},
-	},
 }

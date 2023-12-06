@@ -2,7 +2,6 @@ package cat
 
 import (
 	"github.com/clickcode-dev/fiberdi"
-	"github.com/clickcode-dev/fiberdi/cmd/dog"
 )
 
 var Module = fiberdi.Module{
@@ -11,6 +10,5 @@ var Module = fiberdi.Module{
 	},
 	Injectables: []interface{}{
 		&CatService{},
-		&dog.DogService{},
 	},
 }

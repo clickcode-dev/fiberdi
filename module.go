@@ -2,37 +2,143 @@ package fiberdi
 
 import (
 	"fmt"
-	"log"
+	"os"
 	"reflect"
 
 	"github.com/gofiber/fiber/v2"
+
+	"github.com/charmbracelet/log"
+
 	"github.com/sarulabs/di"
 )
 
-type IModule interface{}
+type IModule interface {
+	start(*fiber.App) *fiber.App
+	verifyIfIsAnAttemptToInjectController(interface{}, interface{})
+	buildDependency(*fiber.App, interface{}, *di.Builder) *fiber.App
+	generateDependecies(*fiber.App) *fiber.App
+}
 
+// Module manage your dependencies and routes
+//
+//	appModule := &fiberdi.Module{}
 type Module struct {
+	// Controller needs function Routes
+	//
+	//	type YourController struct {}
+	//
+	// 	func (controller YourController) Routes(app *fiber.App) *fiber.App {
+	//  	app.Get("/", DoSomething)
+	//		return app
+	//	}
+	//
+	//	appModule := &fiberdi.Module{
+	//		Controllers: []fiberdi.IController{
+	//			&YourController{},
+	//		},
+	//	}
 	Controllers []IController
+
+	// Injectables persist all your dependencies
+	//
+	//	type YourService struct {}
+	//
+	// 	func (controller YourService) DoSomething(ctx *fiber.Ctx) error {
+	//  	return ctx.JSON("OK")
+	//	}
+	//
+	//	type YourController struct {
+	//		YourService *YourService
+	//	}
+	//
+	// 	func (controller YourController) Routes(app *fiber.App) *fiber.App {
+	//  	app.Get("/", controller.YourService.DoSomething)
+	//		return app
+	//	}
+	//
+	//	appModule := &fiberdi.Module{
+	//		Controllers: []fiberdi.IController{
+	//			&YourController{},
+	//		},
+	//		Injectables: []interface{}{
+	//			&YourService{},
+	//		},
+	//	}
 	Injectables []interface{}
-	Modules     []Module
-	Exports     []interface{}
 
-	injectables *[]string
-	exportsName *[]string
-	exports     *[]interface{}
+	// You can create submodules
+	//
+	//	type CatService struct {}
+	//
+	// 	func (controller CatService) DoSomething(ctx *fiber.Ctx) error {
+	//  	return ctx.JSON("Cat")
+	//	}
+	//
+	//	type CatController struct {
+	//		CatService *CatService
+	//	}
+	//
+	// 	func (controller CatController) Routes(app *fiber.App) *fiber.App {
+	//  	app.Get("/", controller.CatService.DoSomething)
+	//		return app
+	//	}
+	//
+	//	catModule := &fiberdi.Module{
+	//		Controllers: []fiberdi.IController{
+	//			&CatController{},
+	//		},
+	//		Injectables: []interface{}{
+	//			&CatService{},
+	//		},
+	//	}
+	//
+	//	appModule := &fiberdi.Module{
+	//		Modules: []fiberdi.IModule{
+	//			catModule,
+	//		},
+	//	}
+	Modules []IModule
 }
 
-func (m Module) start() {
-	builder := m.generateDependecies()
+var loggerGeneral = log.NewWithOptions(os.Stdout, log.Options{
+	ReportTimestamp: true,
+	Level:           ternary(os.Getenv("GO_ENV") != "production", log.DebugLevel, log.InfoLevel),
+})
 
-	builder.Build()
+func (m Module) start(app *fiber.App) *fiber.App {
+	for _, module := range m.Modules {
+		app = module.start(app)
+	}
+
+	return m.generateDependecies(app)
 }
 
-func (m Module) buildDependency(dep interface{}, builder *di.Builder) {
-	valueOf := reflect.ValueOf(dep)
+func (m Module) verifyIfIsAnAttemptToInjectController(structt interface{}, inject interface{}) {
+	_, structtIsController := structt.(IController)
+	_, injectIsController := inject.(IController)
+
+	if injectIsController && structtIsController {
+		log.Fatalf("you cannot inject %T", inject)
+	}
+}
+
+func (m Module) injectThirdDependencies(builder *di.Builder) {
+	builder.Add(di.Def{
+		Name:  "Logger",
+		Scope: di.Request,
+		Build: func(ctn di.Container) (interface{}, error) {
+			return newLogger(), nil
+		},
+	})
+}
+
+func (m Module) buildDependency(app *fiber.App, structt interface{}, builder *di.Builder) *fiber.App {
+	loggerGeneral.SetPrefix(fmt.Sprintf("%T", structt))
+
+	valueOf := reflect.ValueOf(structt)
 
 	if valueOf.Kind() != reflect.Ptr {
-		panic(fmt.Errorf("are you sure? maybe %T is not a pointer, please check", dep))
+		log.Fatalf("are you sure? maybe %T is not a pointer, please check", structt)
 	}
 
 	pointer := reflect.Indirect(valueOf)
@@ -41,149 +147,66 @@ func (m Module) buildDependency(dep interface{}, builder *di.Builder) {
 		Name:  pointer.Type().Name(),
 		Scope: di.Request,
 		Build: func(ctn di.Container) (interface{}, error) {
+			for i := 0; i < pointer.NumField(); i++ {
+				field := pointer.Type().Field(i)
+				name := field.Name
 
-			return dep, nil
+				tagDi := getStructTag(field, "di")
+
+				if tagDi == "ignore" {
+					loggerGeneral.Debugf("Ignoring field %s because tag ignore is set", name)
+					continue
+				}
+
+				inject, err := ctn.SafeGet(name)
+
+				if err != nil {
+					log.Fatalf("tip: are you trying to access %T inside %T before inject in module?\n\n%v", inject, structt, err)
+				}
+
+				if logger, ok := inject.(*log.Logger); ok {
+					logger.SetPrefix(pointer.Type().Name())
+				}
+
+				injectValueOf := reflect.ValueOf(inject)
+
+				m.verifyIfIsAnAttemptToInjectController(structt, inject)
+
+				valueOf.Elem().Field(i).Set(injectValueOf)
+			}
+
+			if controller, ok := structt.(IController); ok {
+				app = controller.Routes(app)
+			}
+
+			loggerGeneral.Debugf("dependencies initialized")
+
+			return structt, nil
 		},
 	})
+
+	return app
 }
 
-func (m Module) generateDependecies() *di.Builder {
+func getStructTag(f reflect.StructField, tagName string) string {
+	return string(f.Tag.Get(tagName))
+}
+
+func (m Module) generateDependecies(app *fiber.App) *fiber.App {
 	builder, err := di.NewBuilder(di.Request)
 
 	if err != nil {
 		panic(err)
 	}
 
-	for _, controller := range m.Controllers {
-		m.buildDependency(controller, builder)
-	}
-
-	return builder
-}
-
-func (m Module) foundInjectables(appModule *Module, injectables *[]string) *[]string {
-	for _, module := range m.Modules {
-		for _, inject := range m.Injectables {
-			typee := reflect.Indirect(reflect.ValueOf(inject)).Type()
-
-			injectables = array(append(*injectables, typee.Name()))
-		}
-
-		injectables = module.foundInjectables(appModule, injectables)
-	}
-
-	appModule.injectables = injectables
-
-	return appModule.injectables
-}
-
-func (m Module) foundExports(appModule *Module, exportsName *[]string, exports *[]interface{}) (*[]string, *[]interface{}) {
-	for _, module := range m.Modules {
-		for _, export := range m.Exports {
-			typee := reflect.Indirect(reflect.ValueOf(export)).Type()
-
-			exports = array(append(*exports, export))
-			exportsName = array(append(*exportsName, typee.Name()))
-		}
-
-		exportsName, exports = module.foundExports(appModule, exportsName, exports)
-	}
-
-	appModule.exports = exports
-	appModule.exportsName = exportsName
-
-	return appModule.exportsName, appModule.exports
-}
-
-func (m Module) addDependencies(app *fiber.App) *fiber.App {
-	builder, err := di.NewBuilder(di.Request)
-
-	if err != nil {
-		panic(err)
-	}
-
-	for _, module := range m.Modules {
-		module.exportsName = m.exportsName
-		module.exports = m.exports
-
-		module.foundInjectables(&module, new([]string))
-		module.foundExports(&module, new([]string), new([]interface{}))
-
-		app = module.addDependencies(app)
-	}
+	m.injectThirdDependencies(builder)
 
 	for _, injectable := range m.Injectables {
-		typee := reflect.Indirect(reflect.ValueOf(injectable)).Type()
-
-		builder.Add(di.Def{
-			Name:  typee.Name(),
-			Scope: di.Request,
-			Build: func(ctn di.Container) (interface{}, error) {
-				ref := reflect.Indirect(reflect.ValueOf(injectable))
-
-				for i := 0; i < ref.NumField(); i++ {
-					name := ref.Type().Field(i).Name
-
-					inject, err := ctn.SafeGet(name)
-
-					if err != nil {
-						panic(fmt.Errorf("are you trying to access %s inside %T before inject in module?\n\n%v", name, injectable, err))
-					}
-
-					reflect.ValueOf(injectable).Elem().Field(i).Set(reflect.ValueOf(inject))
-				}
-
-				return injectable, nil
-			},
-		})
-	}
-
-	for _, export := range m.Exports {
-		typee := reflect.Indirect(reflect.ValueOf(export)).Type()
-
-		builder.Add(di.Def{
-			Name:  typee.Name(),
-			Scope: di.Request,
-			Build: func(ctn di.Container) (interface{}, error) {
-				return export, nil
-			},
-		})
+		app = m.buildDependency(app, injectable, builder)
 	}
 
 	for _, controller := range m.Controllers {
-		v := reflect.ValueOf(controller)
-
-		if v.Kind() != reflect.Ptr {
-			panic(fmt.Errorf("are you sure? Maybe %T is not a pointer, please check", controller))
-		}
-
-		typee := reflect.Indirect(v).Type()
-
-		builder.Add(di.Def{
-			Name:  typee.Name(),
-			Scope: di.Request,
-			Build: func(ctn di.Container) (interface{}, error) {
-				ref := reflect.Indirect(reflect.ValueOf(controller))
-
-				for i := 0; i < ref.NumField(); i++ {
-					name := ref.Type().Field(i).Name
-
-					inject, err := ctn.SafeGet(name)
-
-					if err != nil {
-						panic(fmt.Errorf("are you trying to access %s inside %T before inject in module?\n\n%v", name, controller, err))
-					}
-
-					log.Println(name, reflect.Indirect(reflect.ValueOf(inject)).Type().Name())
-
-					reflect.ValueOf(controller).Elem().Field(i).Set(reflect.ValueOf(inject))
-				}
-
-				app = controller.Routes(app)
-
-				return controller, nil
-			},
-		})
+		app = m.buildDependency(app, controller, builder)
 	}
 
 	build := builder.Build()

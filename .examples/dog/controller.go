@@ -1,6 +1,8 @@
 package dog
 
-import "github.com/gofiber/fiber/v2"
+import (
+	"github.com/gofiber/fiber/v2"
+)
 
 type DogController struct {
 	DogService *DogService
