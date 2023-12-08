@@ -114,22 +114,25 @@ FiberDI uses Dependency Injection in conjunction with the practices used at Clic
 #### Post Construct
 
 Will be executed after inject dependencies
-type Service struct {
-Example Example
-}
-func (service \*Service) PostConstruct() {
-log.Print(service.Example == nil) // false
-}
+
+    type Service struct {
+    	Example Example
+    }
+    func (service \*Service) PostConstruct() {
+    	log.Print(service.Example == nil) // false
+    }
 
 #### Pre Construct
 
 Will be executed before inject dependencies
-type Service struct {
-Example *Example
-}
-func (service *Service) PreConstruct() {
-log.Print(service.Example == nil) // true
-}
+
+    type Service struct {
+    	Example *Example
+    }
+
+    func (service *Service) PreConstruct() {
+    	log.Print(service.Example == nil) // true
+    }
 
 ### Utilities
 
