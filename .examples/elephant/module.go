@@ -13,5 +13,7 @@ var Module = &fiberdi.Module{
 		&ElephantService{},
 		&dog.DogService{},
 	},
-	Imports: []fiberdi.IModule{},
+	Imports: []fiberdi.IModule{
+		dog.Module,
+	},
 }
