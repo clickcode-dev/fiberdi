@@ -7,7 +7,7 @@ type CatService struct {
 }
 
 func (service *CatService) HelloWorld() string {
-	service.Logger.Info("testando")
+	service.Logger.Info("Wow! Logger is poggers :O")
 
 	return "Cat"
 }
