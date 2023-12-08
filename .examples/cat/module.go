@@ -4,7 +4,7 @@ import (
 	"github.com/clickcode-dev/fiberdi"
 )
 
-var Module = fiberdi.Module{
+var Module = &fiberdi.Module{
 	Controllers: []fiberdi.IController{
 		&CatController{},
 	},

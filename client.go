@@ -1,27 +1,12 @@
 package fiberdi
 
 import (
-	"log"
-
 	"github.com/bytedance/sonic"
+	"github.com/charmbracelet/log"
 	"github.com/gofiber/fiber/v2"
 )
 
-//	appModule := &fiberdi.Module{}
-//
-// New creates a new Fiber named instance.
-//
-//	app := fiberdi.New(appModule)
-//
-// You can pass optional configuration options by passing a Config struct:
-//
-//	app := fiber.New(appModule, fiber.Config{
-//	    Prefork: true,
-//	    ServerHeader: "Fiber",
-//	})
-//
-// ATTENTION: DisableStartupMessage is true and cannot be changed
-func New(module *Module, configs ...fiber.Config) *fiber.App {
+func New(module IModule, configs ...fiber.Config) *fiber.App {
 	config := fiber.Config{
 		DisableStartupMessage: true,
 		JSONEncoder:           sonic.Marshal,
@@ -41,6 +26,10 @@ func New(module *Module, configs ...fiber.Config) *fiber.App {
 	}
 
 	app := fiber.New(config)
+
+	module.setInjectableCurrentInAppModuleFn(module.(*Module).setInjectableCurrent)
+	module.setInjectablesNames(module.mappedInjectables(module.(*Module).Modules, []string{}))
+	module.setExportsNames(module.mappedExports(module.(*Module).Modules, []string{}))
 
 	app = module.start(app)
 

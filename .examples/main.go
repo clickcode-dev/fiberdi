@@ -7,6 +7,7 @@ import (
 	"github.com/clickcode-dev/fiberdi"
 	"github.com/clickcode-dev/fiberdi/.examples/cat"
 	"github.com/clickcode-dev/fiberdi/.examples/dog"
+	"github.com/clickcode-dev/fiberdi/.examples/elephant"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -15,6 +16,7 @@ func main() {
 		Modules: []fiberdi.IModule{
 			dog.Module,
 			cat.Module,
+			elephant.Module,
 		},
 	}
 

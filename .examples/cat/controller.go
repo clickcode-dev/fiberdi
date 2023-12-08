@@ -8,7 +8,7 @@ type CatController struct {
 	CatService *CatService
 }
 
-func (controller CatController) Routes(app *fiber.App) *fiber.App {
+func (controller *CatController) Routes(app *fiber.App) *fiber.App {
 	app.Get("/cat", func(c *fiber.Ctx) error {
 		return c.JSON(controller.CatService.HelloWorld())
 	})
