@@ -118,7 +118,7 @@ Will be executed after inject dependencies
     type Service struct {
     	Example Example
     }
-    func (service \*Service) PostConstruct() {
+    func (service *Service) PostConstruct() {
     	log.Print(service.Example == nil) // false
     }
 
@@ -136,6 +136,10 @@ Will be executed before inject dependencies
 
 ### Utilities
 
+#### Logger
+
+##### By default, fiberdi will inject logger if you declare in your struct
+
     import "github.com/clickcode-dev/fiberdi/log"
 
     type Service struct {
@@ -145,6 +149,12 @@ Will be executed before inject dependencies
     func (service *Service) PreConstruct() {
     	log.Print("Wow! It's works")
     }
+
+### Silent debug logs
+
+If you want to silent debug logs, you will need to set a environment variable
+
+    FIBER_MODE=release
 
 ### Run our example
 
