@@ -6,9 +6,9 @@ import (
 
 var Module = &fiberdi.Module{
 	Controllers: []fiberdi.IController{
-		&CatController{},
+		new(CatController),
 	},
 	Injectables: []interface{}{
-		&CatService{},
+		new(CatService),
 	},
 }

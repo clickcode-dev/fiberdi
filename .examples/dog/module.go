@@ -1,15 +1,19 @@
 package dog
 
-import "github.com/clickcode-dev/fiberdi"
+import (
+	"github.com/clickcode-dev/fiberdi"
+	"github.com/clickcode-dev/fiberdi/.examples/cat"
+)
 
 var Module = &fiberdi.Module{
 	Controllers: []fiberdi.IController{
-		&DogController{},
+		new(DogController),
 	},
 	Injectables: []interface{}{
-		&DogService{},
+		new(DogService),
+		new(cat.CatService),
 	},
-	Exports: []interface{}{
-		&DogService{},
+	Imports: []fiberdi.IModule{
+		cat.Module,
 	},
 }

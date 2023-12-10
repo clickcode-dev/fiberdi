@@ -9,9 +9,11 @@ type CatController struct {
 }
 
 func (controller *CatController) Routes(app *fiber.App) *fiber.App {
-	app.Get("/cat", func(c *fiber.Ctx) error {
-		return c.JSON(controller.CatService.HelloWorld())
-	})
+	app.Get("/cat", controller.findCats)
 
 	return app
+}
+
+func (controller *CatController) findCats(ctx *fiber.Ctx) error {
+	return ctx.JSON(controller.CatService.HelloWorld())
 }

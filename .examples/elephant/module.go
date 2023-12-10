@@ -7,11 +7,11 @@ import (
 
 var Module = &fiberdi.Module{
 	Controllers: []fiberdi.IController{
-		&ElephantController{},
+		new(ElephantController),
 	},
 	Injectables: []interface{}{
-		&ElephantService{},
-		&dog.DogService{},
+		new(ElephantService),
+		new(dog.DogService),
 	},
 	Imports: []fiberdi.IModule{
 		dog.Module,

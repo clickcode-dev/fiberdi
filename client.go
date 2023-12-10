@@ -2,28 +2,22 @@ package fiberdi
 
 import (
 	"github.com/bytedance/sonic"
-	"github.com/charmbracelet/log"
 	"github.com/gofiber/fiber/v2"
 )
 
 func New(module IModule, configs ...fiber.Config) *fiber.App {
-	config := fiber.Config{
-		DisableStartupMessage: true,
-		JSONEncoder:           sonic.Marshal,
-		JSONDecoder:           sonic.Unmarshal,
-	}
+	config := fiber.Config{}
 
-	if len(configs) == 1 {
+	if len(configs) > 0 {
 		config = configs[0]
-
-		config.DisableStartupMessage = true
-		config.JSONEncoder = sonic.Marshal
-		config.JSONDecoder = sonic.Unmarshal
 	}
 
-	if len(configs) > 1 {
-		log.Fatalf("it's not supported more than one configuration in fiber")
-	}
+	config.ReduceMemoryUsage = true
+	config.StrictRouting = true
+	config.CaseSensitive = true
+	config.DisableStartupMessage = true
+	config.JSONEncoder = sonic.Marshal
+	config.JSONDecoder = sonic.Unmarshal
 
 	app := fiber.New(config)
 

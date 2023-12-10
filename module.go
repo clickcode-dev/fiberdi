@@ -1,9 +1,11 @@
 package fiberdi
 
 import (
+	"fmt"
 	"os"
 	"reflect"
-	"slices"
+
+	"github.com/Goldziher/go-utils/sliceutils"
 
 	"github.com/clickcode-dev/fiberdi/flog"
 	"github.com/gofiber/fiber/v2"
@@ -23,10 +25,10 @@ type IModule interface {
 	mappedInjectables(modules []IModule, names []string) []string
 	start(app *fiber.App) *fiber.App
 	verifyIfIsAnAttemptToInjectController(structt interface{}, inject interface{})
-	configureThirdDependecies(pointer reflect.Value, inject interface{})
+	configureThirdDependecies(pointer reflect.Value, inject interface{}) interface{}
 	injectThirdDependencies()
 	isAttemptToImportSomethingNotExported(name string, injecteds []string) bool
-	getDependency(container di.Container, name string) (interface{}, error)
+	getDependency(container di.Container, pointer reflect.Value, name string) (interface{}, error)
 	injectDependencies(ctn di.Container, field reflect.StructField, logger *log.Logger, pointer reflect.Value, structt interface{}, valueOf reflect.Value) reflect.Value
 	buildDependency(app *fiber.App, structt interface{}, injecteds *[]string) *fiber.App
 	getStructTag(f reflect.StructField, tagName string) string
@@ -87,13 +89,13 @@ func (m *Module) mappedInjectables(modules []IModule, names []string) []string {
 			valueOf := reflect.ValueOf(injectable)
 
 			if valueOf.Kind() != reflect.Ptr {
-				log.Fatalf("are you sure? maybe %T is not a pointer, please check", injectable)
+				panic(fmt.Errorf("are you sure? maybe %T is not a pointer, please check", injectable))
 			}
 
 			pointer := reflect.Indirect(valueOf)
 			name := pointer.Type().Name()
 
-			if slices.Index(names, name) == -1 {
+			if sliceutils.FindIndexOf(names, name) == -1 {
 				names = append(names, name)
 			}
 		}
@@ -110,16 +112,16 @@ func (m *Module) mappedExports(modules []IModule, names []string) []string {
 			valueOf := reflect.ValueOf(exports)
 
 			if valueOf.Kind() != reflect.Ptr {
-				log.Fatalf("are you sure? maybe %T is not a pointer, please check", exports)
+				panic(fmt.Errorf("are you sure? maybe %T is not a pointer, please check", exports))
 			}
 
 			pointer := reflect.Indirect(valueOf)
 			name := pointer.Type().Name()
 
-			if slices.Index(names, name) == -1 {
+			if sliceutils.FindIndexOf(names, name) == -1 {
 				names = append(names, name)
 			} else {
-				log.Fatalf("are you trying to export %s in two modules?", name)
+				panic(fmt.Errorf("are you trying to export %s in two modules?", name))
 			}
 		}
 
@@ -133,7 +135,7 @@ func (m *Module) start(app *fiber.App) *fiber.App {
 	builder, err := di.NewBuilder(di.Request)
 
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	m.builder = builder
@@ -162,15 +164,21 @@ func (m *Module) verifyIfIsAnAttemptToInjectController(structt interface{}, inje
 	_, injectIsController := inject.(IController)
 
 	if injectIsController && structtIsController {
-		log.Fatalf("you cannot inject %T inside another controller", inject)
+		panic(fmt.Errorf("you cannot inject %T inside another controller", inject))
 	}
 }
 
-func (m *Module) configureThirdDependecies(pointer reflect.Value, inject interface{}) {
-	if hook, ok := inject.(*log.Logger); ok {
-		hook.SetPrefix(pointer.Type().Name())
+func (m *Module) configureThirdDependecies(pointer reflect.Value, inject interface{}) interface{} {
+	if _, ok := inject.(*log.Logger); ok {
+		logger := flog.NewLogger(ternary(os.Getenv("FIBER_MODE") != "release", log.DebugLevel, log.InfoLevel))
+		logger.SetPrefix(pointer.Type().Name())
+
+		return logger
 	}
+
+	return inject
 }
+
 func (m *Module) injectThirdDependencies() {
 	m.builder.Add(di.Def{
 		Name:  "Logger",
@@ -181,25 +189,27 @@ func (m *Module) injectThirdDependencies() {
 	})
 }
 
-func (m *Module) getDependency(container di.Container, name string) (interface{}, error) {
+func (m *Module) getDependency(container di.Container, pointer reflect.Value, name string) (interface{}, error) {
 	var err error
 	var inject interface{}
 
 	for _, parent := range m.parentContainers {
+		if inject != nil {
+			break
+		}
+
 		if parent == nil {
 			continue
 		}
 
 		inject, _ = parent.SafeGet(name)
-
-		if inject != nil {
-			return inject, err
-		}
 	}
 
 	if inject == nil {
 		inject, err = container.SafeGet(name)
 	}
+
+	inject = m.configureThirdDependecies(pointer, inject)
 
 	return inject, err
 }
@@ -212,17 +222,21 @@ func (m *Module) injectDependencies(
 	structt interface{},
 	valueOf reflect.Value,
 ) reflect.Value {
-	inject, err := m.getDependency(ctn, field.Name)
+	if field.Type.Kind() != reflect.Ptr {
+		panic(fmt.Errorf("are you trying to inject %s as a non-pointer dependency?", field.Type.Name()))
+	}
+
+	injectName := field.Type.Elem().Name()
+
+	inject, err := m.getDependency(ctn, pointer, injectName)
 
 	if err != nil {
-		log.Fatalf("%v\n\nTIP:\n - Are you trying to access %s inside %T before inject in module?\n - Are you trying to inject a dependency that was supposed to be ignored? If so, remember to use di:\"ignore\"", err, field.Name, structt)
+		panic(fmt.Errorf("%v\n\nTIP:\n - Are you trying to access %s inside %T before inject in module?\n - Are you trying to inject a dependency that was supposed to be ignored? If so, remember to use di:\"ignore\"", err, injectName, structt))
 	}
 
 	if hook, ok := inject.(IPostConstruct); ok {
 		hook.PostConstruct()
 	}
-
-	m.configureThirdDependecies(pointer, inject)
 
 	injectValueOf := reflect.ValueOf(inject)
 
@@ -243,7 +257,7 @@ func (m *Module) buildDependency(app *fiber.App, structt interface{}, injecteds 
 	valueOf := reflect.ValueOf(structt)
 
 	if valueOf.Kind() != reflect.Ptr {
-		log.Fatalf("are you sure? maybe %T is not a pointer, please check", structt)
+		panic(fmt.Errorf("are you sure? maybe %T is not a pointer, please check", structt))
 	}
 
 	pointer := reflect.Indirect(valueOf)

@@ -14,8 +14,8 @@ import (
 func main() {
 	appModule := &fiberdi.Module{
 		Modules: []fiberdi.IModule{
-			dog.Module,
 			cat.Module,
+			dog.Module,
 			elephant.Module,
 		},
 	}

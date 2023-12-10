@@ -1,0 +1,505 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>fiberdi: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/clickcode-dev/fiberdi/client.go (100.0%)</option>
+				
+				<option value="file1">github.com/clickcode-dev/fiberdi/internal.go (100.0%)</option>
+				
+				<option value="file2">github.com/clickcode-dev/fiberdi/module.go (90.2%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package fiberdi
+
+import (
+        "github.com/bytedance/sonic"
+        "github.com/gofiber/fiber/v2"
+)
+
+func New(module IModule, configs ...fiber.Config) *fiber.App <span class="cov8" title="1">{
+        config := fiber.Config{}
+
+        if len(configs) &gt; 0 </span><span class="cov8" title="1">{
+                config = configs[0]
+        }</span>
+
+        <span class="cov8" title="1">config.ReduceMemoryUsage = true
+        config.StrictRouting = true
+        config.CaseSensitive = true
+        config.DisableStartupMessage = true
+        config.JSONEncoder = sonic.Marshal
+        config.JSONDecoder = sonic.Unmarshal
+
+        app := fiber.New(config)
+
+        module.setInjectableCurrentInAppModuleFn(module.(*Module).setInjectableCurrent)
+        module.setInjectablesNames(module.mappedInjectables(module.(*Module).Modules, []string{}))
+        module.setExportsNames(module.mappedExports(module.(*Module).Modules, []string{}))
+
+        app = module.start(app)
+
+        return app</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package fiberdi
+
+func ternary[T any](condition bool, ifTrue T, ifFalse T) T <span class="cov8" title="1">{
+        if condition </span><span class="cov8" title="1">{
+                return ifTrue
+        }</span>
+
+        <span class="cov8" title="1">return ifFalse</span>
+}
+
+func filter(vs []string, f func(string) bool) []string <span class="cov8" title="1">{
+        vsf := make([]string, 0)
+        for _, v := range vs </span><span class="cov8" title="1">{
+                if f(v) &amp;&amp; len(v) &gt; 7 </span><span class="cov8" title="1">{
+                        vsf = append(vsf, v)
+                }</span>
+        }
+        <span class="cov8" title="1">return vsf</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package fiberdi
+
+import (
+        "fmt"
+        "os"
+        "reflect"
+
+        "github.com/Goldziher/go-utils/sliceutils"
+
+        "github.com/clickcode-dev/fiberdi/flog"
+        "github.com/gofiber/fiber/v2"
+
+        "github.com/charmbracelet/log"
+
+        "github.com/sarulabs/di"
+)
+
+type IModule interface {
+        setExportsNames(names []string)
+        setInjectableCurrentInAppModuleFn(fn func(string) []string)
+        setInjectablesNames(names []string)
+        addContainer(container di.Container)
+        setParent(module *Module)
+        setInjectableCurrent(name string) []string
+        mappedInjectables(modules []IModule, names []string) []string
+        start(app *fiber.App) *fiber.App
+        verifyIfIsAnAttemptToInjectController(structt interface{}, inject interface{})
+        configureThirdDependecies(pointer reflect.Value, inject interface{}) interface{}
+        injectThirdDependencies()
+        isAttemptToImportSomethingNotExported(name string, injecteds []string) bool
+        getDependency(container di.Container, pointer reflect.Value, name string) (interface{}, error)
+        injectDependencies(ctn di.Container, field reflect.StructField, logger *log.Logger, pointer reflect.Value, structt interface{}, valueOf reflect.Value) reflect.Value
+        buildDependency(app *fiber.App, structt interface{}, injecteds *[]string) *fiber.App
+        getStructTag(f reflect.StructField, tagName string) string
+        generateDependecies(app *fiber.App) (*fiber.App, di.Container)
+        mappedExports(modules []IModule, names []string) []string
+}
+
+type Module struct {
+        Controllers []IController
+        Injectables []interface{}
+        Modules     []IModule
+
+        Imports []IModule
+        Exports []interface{}
+
+        injectablesNames []string
+        exportsNames     []string
+
+        currentInjectable []string
+
+        setInjectableCurrentInAppModule func(string) []string
+
+        builder          *di.Builder
+        parentContainers []di.Container
+        parentModule     IModule
+        container        di.Container
+}
+
+func (m *Module) addContainer(container di.Container) <span class="cov8" title="1">{
+        m.parentContainers = append(m.parentContainers, container)
+}</span>
+
+func (m *Module) setParent(module *Module) <span class="cov8" title="1">{
+        m.parentModule = module
+}</span>
+
+func (m *Module) setInjectableCurrentInAppModuleFn(fn func(string) []string) <span class="cov8" title="1">{
+        m.setInjectableCurrentInAppModule = fn
+}</span>
+
+func (m *Module) setInjectableCurrent(name string) []string <span class="cov8" title="1">{
+        m.currentInjectable = append(m.currentInjectable, name)
+
+        return m.currentInjectable
+}</span>
+
+func (m *Module) setInjectablesNames(names []string) <span class="cov8" title="1">{
+        m.injectablesNames = names
+}</span>
+
+func (m *Module) setExportsNames(names []string) <span class="cov8" title="1">{
+        m.exportsNames = names
+}</span>
+
+func (m *Module) mappedInjectables(modules []IModule, names []string) []string <span class="cov8" title="1">{
+        for _, module := range modules </span><span class="cov8" title="1">{
+                for _, injectable := range module.(*Module).Injectables </span><span class="cov8" title="1">{
+                        valueOf := reflect.ValueOf(injectable)
+
+                        if valueOf.Kind() != reflect.Ptr </span><span class="cov0" title="0">{
+                                panic(fmt.Errorf("are you sure? maybe %T is not a pointer, please check", injectable))</span>
+                        }
+
+                        <span class="cov8" title="1">pointer := reflect.Indirect(valueOf)
+                        name := pointer.Type().Name()
+
+                        if sliceutils.FindIndexOf(names, name) == -1 </span><span class="cov8" title="1">{
+                                names = append(names, name)
+                        }</span>
+                }
+
+                <span class="cov8" title="1">names = module.mappedInjectables(module.(*Module).Modules, names)</span>
+        }
+
+        <span class="cov8" title="1">return names</span>
+}
+
+func (m *Module) mappedExports(modules []IModule, names []string) []string <span class="cov8" title="1">{
+        for _, module := range modules </span><span class="cov8" title="1">{
+                for _, exports := range module.(*Module).Exports </span><span class="cov8" title="1">{
+                        valueOf := reflect.ValueOf(exports)
+
+                        if valueOf.Kind() != reflect.Ptr </span><span class="cov0" title="0">{
+                                panic(fmt.Errorf("are you sure? maybe %T is not a pointer, please check", exports))</span>
+                        }
+
+                        <span class="cov8" title="1">pointer := reflect.Indirect(valueOf)
+                        name := pointer.Type().Name()
+
+                        if sliceutils.FindIndexOf(names, name) == -1 </span><span class="cov8" title="1">{
+                                names = append(names, name)
+                        }</span> else<span class="cov0" title="0"> {
+                                panic(fmt.Errorf("are you trying to export %s in two modules?", name))</span>
+                        }
+                }
+
+                <span class="cov8" title="1">names = module.mappedExports(module.(*Module).Modules, names)</span>
+        }
+
+        <span class="cov8" title="1">return names</span>
+}
+
+func (m *Module) start(app *fiber.App) *fiber.App <span class="cov8" title="1">{
+        builder, err := di.NewBuilder(di.Request)
+
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+
+        <span class="cov8" title="1">m.builder = builder
+
+        app, container := m.generateDependecies(app)
+
+        m.container = container
+
+        for _, module := range m.Modules </span><span class="cov8" title="1">{
+                module.setInjectableCurrentInAppModuleFn(m.setInjectableCurrent)
+                module.addContainer(container)
+
+                for _, importt := range module.(*Module).Imports </span><span class="cov8" title="1">{
+                        module.addContainer(importt.(*Module).container)
+                }</span>
+
+                <span class="cov8" title="1">module.setParent(m)
+                app = module.start(app)</span>
+        }
+
+        <span class="cov8" title="1">return app</span>
+}
+
+func (m *Module) verifyIfIsAnAttemptToInjectController(structt interface{}, inject interface{}) <span class="cov8" title="1">{
+        _, structtIsController := structt.(IController)
+        _, injectIsController := inject.(IController)
+
+        if injectIsController &amp;&amp; structtIsController </span><span class="cov0" title="0">{
+                panic(fmt.Errorf("you cannot inject %T inside another controller", inject))</span>
+        }
+}
+
+func (m *Module) configureThirdDependecies(pointer reflect.Value, inject interface{}) interface{} <span class="cov8" title="1">{
+        if _, ok := inject.(*log.Logger); ok </span><span class="cov8" title="1">{
+                logger := flog.NewLogger(ternary(os.Getenv("FIBER_MODE") != "release", log.DebugLevel, log.InfoLevel))
+                logger.SetPrefix(pointer.Type().Name())
+
+                return logger
+        }</span>
+
+        <span class="cov8" title="1">return inject</span>
+}
+
+func (m *Module) injectThirdDependencies() <span class="cov8" title="1">{
+        m.builder.Add(di.Def{
+                Name:  "Logger",
+                Scope: di.Request,
+                Build: func(ctn di.Container) (interface{}, error) </span><span class="cov8" title="1">{
+                        return flog.NewLogger(ternary(os.Getenv("FIBER_MODE") != "release", log.DebugLevel, log.InfoLevel)), nil
+                }</span>,
+        })
+}
+
+func (m *Module) getDependency(container di.Container, pointer reflect.Value, name string) (interface{}, error) <span class="cov8" title="1">{
+        var err error
+        var inject interface{}
+
+        for _, parent := range m.parentContainers </span><span class="cov8" title="1">{
+                if inject != nil </span><span class="cov0" title="0">{
+                        break</span>
+                }
+
+                <span class="cov8" title="1">if parent == nil </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+
+                <span class="cov8" title="1">inject, _ = parent.SafeGet(name)</span>
+        }
+
+        <span class="cov8" title="1">if inject == nil </span><span class="cov8" title="1">{
+                inject, err = container.SafeGet(name)
+        }</span>
+
+        <span class="cov8" title="1">inject = m.configureThirdDependecies(pointer, inject)
+
+        return inject, err</span>
+}
+
+func (m *Module) injectDependencies(
+        ctn di.Container,
+        field reflect.StructField,
+        logger *log.Logger,
+        pointer reflect.Value,
+        structt interface{},
+        valueOf reflect.Value,
+) reflect.Value <span class="cov8" title="1">{
+        if field.Type.Kind() != reflect.Ptr </span><span class="cov8" title="1">{
+                panic(fmt.Errorf("are you trying to inject %s as a non-pointer dependency?", field.Type.Name()))</span>
+        }
+
+        <span class="cov8" title="1">injectName := field.Type.Elem().Name()
+
+        inject, err := m.getDependency(ctn, pointer, injectName)
+
+        if err != nil </span><span class="cov0" title="0">{
+                panic(fmt.Errorf("%v\n\nTIP:\n - Are you trying to access %s inside %T before inject in module?\n - Are you trying to inject a dependency that was supposed to be ignored? If so, remember to use di:\"ignore\"", err, injectName, structt))</span>
+        }
+
+        <span class="cov8" title="1">if hook, ok := inject.(IPostConstruct); ok </span><span class="cov0" title="0">{
+                hook.PostConstruct()
+        }</span>
+
+        <span class="cov8" title="1">injectValueOf := reflect.ValueOf(inject)
+
+        m.verifyIfIsAnAttemptToInjectController(structt, inject)
+
+        return injectValueOf</span>
+}
+
+func (m *Module) isAttemptToImportSomethingNotExported(name string, injecteds []string) bool <span class="cov8" title="1">{
+        filterInjectable := filter(injecteds, func(inject string) bool </span><span class="cov8" title="1">{
+                return inject == name
+        }</span>)
+
+        <span class="cov8" title="1">return len(filterInjectable) &gt; 1</span>
+}
+
+func (m *Module) buildDependency(app *fiber.App, structt interface{}, injecteds *[]string) *fiber.App <span class="cov8" title="1">{
+        valueOf := reflect.ValueOf(structt)
+
+        if valueOf.Kind() != reflect.Ptr </span><span class="cov0" title="0">{
+                panic(fmt.Errorf("are you sure? maybe %T is not a pointer, please check", structt))</span>
+        }
+
+        <span class="cov8" title="1">pointer := reflect.Indirect(valueOf)
+
+        name := pointer.Type().Name()
+
+        if injecteds != nil &amp;&amp; m.isAttemptToImportSomethingNotExported(name, *injecteds) </span><span class="cov8" title="1">{
+                return app
+        }</span>
+
+        <span class="cov8" title="1">if hook, ok := structt.(IPreConstruct); ok </span><span class="cov0" title="0">{
+                hook.PreConstruct()
+        }</span>
+
+        <span class="cov8" title="1">logger := flog.NewLogger(ternary(os.Getenv("FIBER_MODE") != "release", log.DebugLevel, log.InfoLevel))
+
+        logger.SetPrefix(name)
+
+        m.builder.Add(di.Def{
+                Name:  name,
+                Scope: di.Request,
+                Build: func(ctn di.Container) (interface{}, error) </span><span class="cov8" title="1">{
+                        for i := 0; i &lt; pointer.NumField(); i++ </span><span class="cov8" title="1">{
+                                field := pointer.Type().Field(i)
+
+                                tagDi := m.getStructTag(field, "di")
+
+                                if tagDi == "ignore" </span><span class="cov8" title="1">{
+                                        logger.Debugf("Ignoring field %s because tag ignore is set", field.Name)
+                                        continue</span>
+                                }
+
+                                <span class="cov8" title="1">injectValueOf := m.injectDependencies(ctn, field, logger, pointer, structt, valueOf)
+
+                                valueOf.Elem().Field(i).Set(injectValueOf)</span>
+                        }
+
+                        <span class="cov8" title="1">if controller, ok := structt.(IController); ok </span><span class="cov8" title="1">{
+                                app = controller.Routes(app)
+                        }</span>
+
+                        <span class="cov8" title="1">logger.Debugf("dependencies initialized")
+
+                        if hook, ok := structt.(IPostConstruct); ok </span><span class="cov0" title="0">{
+                                hook.PostConstruct()
+                        }</span>
+
+                        <span class="cov8" title="1">return structt, nil</span>
+                },
+        })
+
+        <span class="cov8" title="1">return app</span>
+}
+
+func (m *Module) getStructTag(f reflect.StructField, tagName string) string <span class="cov8" title="1">{
+        return string(f.Tag.Get(tagName))
+}</span>
+
+func (m *Module) generateDependecies(app *fiber.App) (*fiber.App, di.Container) <span class="cov8" title="1">{
+        m.injectThirdDependencies()
+
+        for _, injectable := range m.Injectables </span><span class="cov8" title="1">{
+                valueOf := reflect.ValueOf(injectable)
+                pointer := reflect.Indirect(valueOf)
+
+                current := m.setInjectableCurrentInAppModule(pointer.Type().Name())
+
+                app = m.buildDependency(app, injectable, &amp;current)
+        }</span>
+
+        <span class="cov8" title="1">for _, controller := range m.Controllers </span><span class="cov8" title="1">{
+                app = m.buildDependency(app, controller, nil)
+        }</span>
+
+        <span class="cov8" title="1">container := m.builder.Build()
+
+        for _, controller := range m.Controllers </span><span class="cov8" title="1">{
+                typee := reflect.Indirect(reflect.ValueOf(controller)).Type()
+
+                container.Get(typee.Name())
+        }</span>
+
+        <span class="cov8" title="1">return app, container</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

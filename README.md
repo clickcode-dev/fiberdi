@@ -34,7 +34,7 @@ FiberDI uses Dependency Injection in conjunction with the practices used at Clic
     func main() {
     	appModule := &fiberdi.Module{
     		Controllers: []fiberdi.IController{
-    			&Controller{},
+    			new(Controller),
     		},
     	}
     	app := fiberdi.New(appModule, fiber.Config{})
@@ -63,10 +63,10 @@ FiberDI uses Dependency Injection in conjunction with the practices used at Clic
     func main() {
     	appModule := &fiberdi.Module{
     		Controllers: []fiberdi.IController{
-    			&Controller{},
+    			new(Controller),
     		},
     		Injectables: []interface{}{
-    			&Service{},
+    			new(Service),
     		},
     	}
     	app := fiberdi.New(appModule, fiber.Config{})
@@ -87,22 +87,22 @@ FiberDI uses Dependency Injection in conjunction with the practices used at Clic
 
     catModule := &fiberdi.Module{
     	Controllers: []fiberdi.IController{
-    		&CatController{},
+    		new(CatController),
     	},
     	Injectables: []interface{}{
-    		&CatService{},
+    		new(CatService),
     	},
     	Exports: []interface{}{
-    		&CatService{},
+    		new(CatService),
     	},
     }
 
     dogModule := &fiberdi.Module{
     	Controllers: []fiberdi.IController{
-    		&DogController{},
+    		new(DogController),
     	},
     	Injectables: []interface{}{
-    		&CatService{},
+    		new(CatService),
     	},
     	Imports: []interface{}{
     		catModule,
