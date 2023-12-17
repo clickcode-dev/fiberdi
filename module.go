@@ -234,10 +234,6 @@ func (m *Module) injectDependencies(
 		panic(fmt.Errorf("%v\n\nTIP:\n - Are you trying to access %s inside %T before inject in module?\n - Are you trying to inject a dependency that was supposed to be ignored? If so, remember to use di:\"ignore\"", err, injectName, structt))
 	}
 
-	if hook, ok := inject.(IPostConstruct); ok {
-		hook.PostConstruct()
-	}
-
 	injectValueOf := reflect.ValueOf(inject)
 
 	m.verifyIfIsAnAttemptToInjectController(structt, inject)
