@@ -340,5 +340,13 @@ func (m *Module) generateDependecies(app *fiber.App) (*fiber.App, di.Container) 
 		container.Get(typee.Name())
 	}
 
+	if len(m.Controllers) == 0 {
+		for _, injectable := range m.Injectables {
+			typee := reflect.Indirect(reflect.ValueOf(injectable)).Type()
+
+			container.Get(typee.Name())
+		}
+	}
+
 	return app, container
 }

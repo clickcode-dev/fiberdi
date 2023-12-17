@@ -7,7 +7,7 @@ import (
 
 type ElephantController struct {
 	ElephantService *ElephantService
-	DogService      *dog.DogService
+	Service         *dog.DogService
 }
 
 func (controller *ElephantController) Routes(app *fiber.App) *fiber.App {
